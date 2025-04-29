@@ -1,0 +1,8 @@
+flask
+flask-cors
+paho-mqtt
+qrcode
+gunicorn
+Pillow
+webdriver_manager
+selenium
