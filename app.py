@@ -51,7 +51,7 @@ def generar_qr():
                 'pedido_id': pedido_id,
                 'expiracion': time.time() + expiracion,
                 'qr_texto': qr_content
-            }, timeout=3)
+            }, timeout=10)
         except Exception as e:
             print(f"Error al enviar QR a la Raspberry Pi: {e}")
 
