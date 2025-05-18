@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Dirección IP de la Raspberry Pi donde se enviarán los datos del QR
-RASPBERRY_PI_URL = 'https://genuine-guppy-valid.ngrok-free.app/guardar_qr'
+RASPBERRY_PI_URL = 'https://e619-181-203-121-228.ngrok-free.app/guardar_qr'
 
 # -----------------------------------------------
 # *Ruta raíz para verificar que el servidor está activo*
