@@ -69,9 +69,9 @@ def crear_pago():
                 }
             ],
             "back_urls": {
-                "success": "https://www.tu-sitio-web.com/pago_exitoso",
-                "failure": "https://www.tu-sitio-web.com/pago_fallido",
-                "pending": "https://www.tu-sitio-web.com/pago_pendiente"
+                "success": "https://mikelsouth.github.io/web_pi1/pago_exitoso",
+                "failure": "https://mikelsouth.github.io/web_pi1/pago_fallido",
+                "pending": "https://mikelsouth.github.io/web_pi1/pago_pendiente"
             },
             "auto_return": "approved",
             "external_reference": str(pedido_id)
