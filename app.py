@@ -9,7 +9,7 @@ import mercadopago
 
 # --- 1. CONFIGURACIÓN DE MERCADO PAGO ---
 # ¡¡REEMPLAZA ESTO CON TU ACCESS TOKEN DE PRUEBA!!
-sdk = mercadopago.SDK("APP_USR-xxxxxxxx-xxxxxx-xxxxxxxx")
+sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
 
 # --- 2. CATÁLOGO DE PRODUCTOS ---
 # ¡¡IMPORTANTE!! Debes editar los precios de tus productos aquí.
@@ -35,7 +35,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Dirección IP de la Raspberry Pi
-RASPBERRY_PI_URL = 'https://19e2-191-126-170-134.ngrok-free.app/guardar_qr'
+RASPBERRY_PI_URL = 'https://9e55-186-40-53-37.ngrok-free.app/guardar_qr'
 
 # -----------------------------------------------
 # RUTA RAÍZ
