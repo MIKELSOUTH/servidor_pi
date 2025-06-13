@@ -6,11 +6,22 @@ import base64
 from io import BytesIO
 import requests  # Para enviar el QR a la Raspberry Pi
 
+# --- INICIO DE LA MODIFICACIÓN ---
+
+# 1. Importar la librería de Mercado Pago
+import mercadopago
+
+# 2. Configurar el SDK con tu Access Token de PRUEBA
+#    (¡¡Pega aquí el Access Token que obtuviste de tu Vendedor de Prueba!!)
+sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
+
+# --- FIN DE LA MODIFICACIÓN ---
+
 app = Flask(__name__)
 CORS(app)
 
 # Dirección IP de la Raspberry Pi donde se enviarán los datos del QR
-RASPBERRY_PI_URL = 'https://19e2-191-126-170-134.ngrok-free.app/guardar_qr'
+RASPBERRY_PI_URL = 'https://9e55-186-40-53-37.ngrok-free.app/guardar_qr'
 # -----------------------------------------------
 # *Ruta raíz para verificar que el servidor está activo*
 @app.route('/')
