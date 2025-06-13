@@ -8,11 +8,10 @@ import requests
 import mercadopago
 
 # --- 1. CONFIGURACIÓN DE MERCADO PAGO ---
-# ¡¡REEMPLAZA ESTO CON TU ACCESS TOKEN DE PRUEBA!!
+# ¡¡REEMPLAZA ESTO CON TU ACCESS TOKEN!!
 sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
-
 # --- 2. CATÁLOGO DE PRODUCTOS ---
-# ¡¡IMPORTANTE!! Debes editar los precios de tus productos aquí.
+# ¡¡REEMPLAZA ESTOS PRECIOS CON LOS REALES!!
 CATALOGO_PRODUCTOS = {
     1: {"nombre": "Coca Cola", "precio": 1000},
     2: {"nombre": "Papas Fritas", "precio": 800},
@@ -34,7 +33,7 @@ CATALOGO_PRODUCTOS = {
 app = Flask(__name__)
 CORS(app)
 
-# Dirección IP de la Raspberry Pi
+# Reemplaza esto con la URL de tu Raspberry Pi
 RASPBERRY_PI_URL = 'https://9e55-186-40-53-37.ngrok-free.app/guardar_qr'
 
 # -----------------------------------------------
@@ -42,7 +41,7 @@ RASPBERRY_PI_URL = 'https://9e55-186-40-53-37.ngrok-free.app/guardar_qr'
 # -----------------------------------------------
 @app.route('/')
 def index():
-    return "Servidor Flask en funcionamiento con Mercado Pago"
+    return "Servidor Flask en funcionamiento"
 
 # -----------------------------------------------
 # RUTA PARA CREAR LA PREFERENCIA DE PAGO
@@ -52,11 +51,8 @@ def crear_pago():
     try:
         data_request = request.get_json()
         pedido_id = data_request.get('pedido_id')
-
-        if not pedido_id:
-            return jsonify({"error": "Falta pedido_id"}), 400
-
         producto = CATALOGO_PRODUCTOS.get(int(pedido_id))
+
         if not producto:
             return jsonify({"error": "Producto no encontrado"}), 404
         
@@ -68,63 +64,75 @@ def crear_pago():
                     "unit_price": producto["precio"]
                 }
             ],
-            "back_urls": {
+            
+           "back_urls": {
                 "success": "https://mikelsouth.github.io/web_pi1/pago_exitoso",
                 "failure": "https://mikelsouth.github.io/web_pi1/pago_fallido",
                 "pending": "https://mikelsouth.github.io/web_pi1/pago_pendiente"
             },
+            
             "auto_return": "approved",
             "external_reference": str(pedido_id)
         }
 
         preference_response = sdk.preference().create(preference_data)
-        preference = preference_response["response"]
-        return jsonify({"preference_id": preference["id"]})
+        return jsonify({"preference_id": preference_response["response"]["id"]})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 # -----------------------------------------------
-# RUTA ORIGINAL PARA GENERAR QR
+# RUTA PARA RECIBIR AVISOS DE PAGO (WEBHOOK)
 # -----------------------------------------------
-@app.route('/generar_qr', methods=['POST'])
-def generar_qr():
+@app.route('/mercadopago-webhook', methods=['POST'])
+def mercadopago_webhook():
     try:
         data = request.get_json()
-        if 'pedido_id' not in data or 'expiracion' not in data or 'telefono' not in data:
-            return jsonify({'error': 'Faltan parámetros en la solicitud'}), 400
+        if data.get("type") == "payment":
+            payment_id = data["data"]["id"]
+            
+            payment_info = sdk.payment().get(payment_id)
+            payment = payment_info["response"]
 
-        pedido_id = data['pedido_id']
-        expiracion = data['expiracion']
-        telefono = data['telefono']
+            if payment["status"] == "approved":
+                pedido_id = payment["external_reference"]
+                print(f"Pago aprobado para pedido_id: {pedido_id}. Generando QR...")
 
-        qr_content = f"{pedido_id},{expiracion}"
-        qr = qrcode.make(qr_content)
-        buffer = BytesIO()
-        qr.save(buffer)
-        buffer.seek(0)
-        img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-
-        try:
-            requests.post(RASPBERRY_PI_URL, json={
-                'pedido_id': pedido_id,
-                'expiracion': time.time() + expiracion,
-                'qr_texto': qr_content
-            }, timeout=5)
-        except Exception as e:
-            print(f"Error al enviar QR a la Raspberry Pi: {e}")
-
-        return jsonify({
-            'pedido_id': pedido_id,
-            'expiracion': time.time() + expiracion,
-            'qr_base64': img_base64
-        })
+                expiracion = 600
+                qr_content = f"{pedido_id},{expiracion}"
+                
+                qr = qrcode.make(qr_content)
+                buffer = BytesIO()
+                qr.save(buffer)
+                buffer.seek(0)
+                img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+                
+                try:
+                    requests.post(RASPBERRY_PI_URL, json={
+                        'pedido_id': pedido_id,
+                        'expiracion': time.time() + expiracion,
+                        'qr_texto': qr_content
+                    }, timeout=10)
+                    print(f"QR para pedido_id: {pedido_id} enviado a la Raspberry Pi.")
+                except Exception as e:
+                    print(f"Error al enviar QR a la Raspberry Pi: {e}")
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error en webhook: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"status": "ok"}), 200
 
 # -----------------------------------------------
 # INICIAR EL SERVIDOR
 # -----------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=10000)
+
+
+
+
+
+
+
+
