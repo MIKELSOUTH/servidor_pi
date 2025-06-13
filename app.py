@@ -4,38 +4,93 @@ import time
 from flask_cors import CORS
 import base64
 from io import BytesIO
-import requests  # Para enviar el QR a la Raspberry Pi
-
-# --- INICIO DE LA MODIFICACIÓN ---
-
-# 1. Importar la librería de Mercado Pago
+import requests
 import mercadopago
 
-# 2. Configurar el SDK con tu Access Token de PRUEBA
-#    (¡¡Pega aquí el Access Token que obtuviste de tu Vendedor de Prueba!!)
-sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
+# --- 1. CONFIGURACIÓN DE MERCADO PAGO ---
+# ¡¡REEMPLAZA ESTO CON TU ACCESS TOKEN DE PRUEBA!!
+sdk = mercadopago.SDK("APP_USR-xxxxxxxx-xxxxxx-xxxxxxxx")
 
-# --- FIN DE LA MODIFICACIÓN ---
+# --- 2. CATÁLOGO DE PRODUCTOS ---
+# ¡¡IMPORTANTE!! Debes editar los precios de tus productos aquí.
+CATALOGO_PRODUCTOS = {
+    1: {"nombre": "Coca Cola", "precio": 1000},
+    2: {"nombre": "Papas Fritas", "precio": 800},
+    3: {"nombre": "Galletas", "precio": 600},
+    4: {"nombre": "Chocolates", "precio": 1200},
+    5: {"nombre": "Jugos", "precio": 900},
+    6: {"nombre": "Agua", "precio": 700},
+    7: {"nombre": "Snacks", "precio": 850},
+    8: {"nombre": "Café", "precio": 1500},
+    9: {"nombre": "Té", "precio": 1300},
+    10: {"nombre": "Energizantes", "precio": 1800},
+    11: {"nombre": "Refrescos", "precio": 950},
+    12: {"nombre": "Leche", "precio": 800},
+    13: {"nombre": "Frutos Secos", "precio": 2000},
+    14: {"nombre": "Galletas Saladas", "precio": 650},
+    15: {"nombre": "Dulces", "precio": 500}
+}
 
 app = Flask(__name__)
 CORS(app)
 
-# Dirección IP de la Raspberry Pi donde se enviarán los datos del QR
-RASPBERRY_PI_URL = 'https://9e55-186-40-53-37.ngrok-free.app/guardar_qr'
-# -----------------------------------------------
-# *Ruta raíz para verificar que el servidor está activo*
-@app.route('/')
-def index():
-    return "Servidor Flask en funcionamiento"
+# Dirección IP de la Raspberry Pi
+RASPBERRY_PI_URL = 'https://19e2-191-126-170-134.ngrok-free.app/guardar_qr'
 
 # -----------------------------------------------
-# *Ruta para generar un código QR y enviarlo tanto al cliente como a la Raspberry Pi*
+# RUTA RAÍZ
+# -----------------------------------------------
+@app.route('/')
+def index():
+    return "Servidor Flask en funcionamiento con Mercado Pago"
+
+# -----------------------------------------------
+# RUTA PARA CREAR LA PREFERENCIA DE PAGO
+# -----------------------------------------------
+@app.route('/crear_pago', methods=['POST'])
+def crear_pago():
+    try:
+        data_request = request.get_json()
+        pedido_id = data_request.get('pedido_id')
+
+        if not pedido_id:
+            return jsonify({"error": "Falta pedido_id"}), 400
+
+        producto = CATALOGO_PRODUCTOS.get(int(pedido_id))
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        preference_data = {
+            "items": [
+                {
+                    "title": producto["nombre"],
+                    "quantity": 1,
+                    "unit_price": producto["precio"]
+                }
+            ],
+            "back_urls": {
+                "success": "https://www.tu-sitio-web.com/pago_exitoso",
+                "failure": "https://www.tu-sitio-web.com/pago_fallido",
+                "pending": "https://www.tu-sitio-web.com/pago_pendiente"
+            },
+            "auto_return": "approved",
+            "external_reference": str(pedido_id)
+        }
+
+        preference_response = sdk.preference().create(preference_data)
+        preference = preference_response["response"]
+        return jsonify({"preference_id": preference["id"]})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# -----------------------------------------------
+# RUTA ORIGINAL PARA GENERAR QR
+# -----------------------------------------------
 @app.route('/generar_qr', methods=['POST'])
 def generar_qr():
     try:
-        # *Obtener datos del pedido desde la solicitud POST*
         data = request.get_json()
-
         if 'pedido_id' not in data or 'expiracion' not in data or 'telefono' not in data:
             return jsonify({'error': 'Faltan parámetros en la solicitud'}), 400
 
@@ -43,19 +98,13 @@ def generar_qr():
         expiracion = data['expiracion']
         telefono = data['telefono']
 
-        # *Generar el contenido del QR como texto*
         qr_content = f"{pedido_id},{expiracion}"
-
-        # *Crear la imagen del QR*
         qr = qrcode.make(qr_content)
-
-        # *Convertir la imagen del QR a base64 para enviar al cliente*
         buffer = BytesIO()
         qr.save(buffer)
         buffer.seek(0)
         img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
-        # *Enviar los datos del QR a la Raspberry Pi*
         try:
             requests.post(RASPBERRY_PI_URL, json={
                 'pedido_id': pedido_id,
@@ -65,7 +114,6 @@ def generar_qr():
         except Exception as e:
             print(f"Error al enviar QR a la Raspberry Pi: {e}")
 
-        # *Devolver el QR generado al cliente en formato base64*
         return jsonify({
             'pedido_id': pedido_id,
             'expiracion': time.time() + expiracion,
@@ -76,6 +124,7 @@ def generar_qr():
         return jsonify({'error': str(e)}), 500
 
 # -----------------------------------------------
-# *Iniciar el servidor Flask*
+# INICIAR EL SERVIDOR
+# -----------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=10000)
