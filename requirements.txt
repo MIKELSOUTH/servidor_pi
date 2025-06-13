@@ -5,4 +5,5 @@ qrcode
 gunicorn
 Pillow
 webdriver_manager
+mercadopago
 selenium
