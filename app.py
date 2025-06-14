@@ -10,6 +10,11 @@ import mercadopago
 # --- 1. CONFIGURACIÓN DE MERCADO PAGO ---
 sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
 
+# --- MEJORA DE SEGURIDAD: AÑADE AQUÍ LA CLAVE SECRETA DE TU WEBHOOK ---
+# Esta es la clave que te generó Mercado Pago cuando configuraste la URL del webhook.
+WEBHOOK_SECRET = "b0e92cbf35214019555fb9c9106b73c3625d27bfd61f433ac6d0744b1e1b8e14"
+
+
 # --- 2. CATÁLOGO DE PRODUCTOS ---
 CATALOGO_PRODUCTOS = {
     1: {"nombre": "Coca Cola", "precio": 1000},
@@ -55,7 +60,6 @@ def crear_pago():
         if not producto:
             return jsonify({"error": "Producto no encontrado"}), 404
         
-        # AJUSTE PARA SOLUCIONAR ERROR 404: Se agrega .html al final de las URLs
         preference_data = {
             "items": [
                 {
@@ -80,29 +84,53 @@ def crear_pago():
         return jsonify({"error": str(e)}), 500
 
 # -----------------------------------------------
-# RUTA PARA RECIBIR AVISOS DE PAGO (WEBHOOK) CON DIAGNÓSTICO DETALLADO
+# RUTA PARA RECIBIR AVISOS DE PAGO (WEBHOOK) - VERSIÓN FINAL MEJORADA
 # -----------------------------------------------
 @app.route('/mercadopago-webhook', methods=['POST'])
 def mercadopago_webhook():
     print("\n--- INICIANDO WEBHOOK ---")
+    
+    # --- MEJORA 1: VERIFICACIÓN DE FIRMA (SEGURIDAD) ---
+    # Obtenemos la firma de la cabecera de la petición
+    signature = request.headers.get('x-signature')
+    data_id = request.args.get('data.id')
+    
+    if WEBHOOK_SECRET and signature and data_id:
+        print("1. Verificando firma del webhook...")
+        try:
+            # Usamos la función del SDK para validar. Si la firma es inválida, generará un error.
+            sdk.utils().validate_signature(signature, data_id, WEBHOOK_SECRET)
+            print("2. ¡Firma validada con éxito!")
+        except Exception as e:
+            print(f"!!! ERROR DE SEGURIDAD: Firma de webhook inválida. {e}")
+            return jsonify({"status": "error", "message": "Invalid signature"}), 400
+    # --- FIN DE MEJORA 1 ---
+
     try:
         data = request.get_json()
-        print(f"1. DATOS RECIBIDOS: {data}")
+        print(f"3. DATOS RECIBIDOS: {data}")
 
+        # --- MEJORA 2: OBTENCIÓN DE DATOS MÁS SEGURA ---
+        # Usamos .get() para evitar que el programa se caiga si el formato no es el esperado
         if data and data.get("type") == "payment":
-            print("2. TIPO DE NOTIFICACIÓN: 'payment'. Correcto.")
-            payment_id = data["data"]["id"]
-            print(f"3. ID DE PAGO EXTRAÍDO: {payment_id}")
+            print("4. TIPO DE NOTIFICACIÓN: 'payment'. Correcto.")
+            payment_id = data.get("data", {}).get("id")
+            if not payment_id:
+                print("!!! ERROR: El webhook es de tipo 'payment' pero no contiene un 'id'.")
+                return jsonify({"status": "ok"}), 200 # Respondemos 200 para que MP no reintente
+            # --- FIN DE MEJORA 2 ---
 
-            print("4. BUSCANDO INFORMACIÓN DEL PAGO EN MERCADO PAGO...")
+            print(f"5. ID DE PAGO EXTRAÍDO: {payment_id}")
+
+            print("6. BUSCANDO INFORMACIÓN DEL PAGO EN MERCADO PAGO...")
             payment_info = sdk.payment().get(payment_id)
             payment = payment_info["response"]
-            print(f"5. INFORMACIÓN RECIBIDA. ESTADO: {payment.get('status')}")
+            print(f"7. INFORMACIÓN RECIBIDA. ESTADO: {payment.get('status')}")
 
             if payment.get("status") == "approved":
-                print("6. ¡PAGO APROBADO! Se procede a generar el QR.")
+                print("8. ¡PAGO APROBADO! Se procede a generar el QR.")
                 pedido_id = payment.get("external_reference")
-                print(f"7. ID DEL PEDIDO OBTENIDO: {pedido_id}")
+                print(f"9. ID DEL PEDIDO OBTENIDO: {pedido_id}")
 
                 if not pedido_id:
                     print("!!! ERROR FATAL: No se encontró 'external_reference' en el pago.")
@@ -110,31 +138,31 @@ def mercadopago_webhook():
 
                 expiracion = 600
                 qr_content = f"{pedido_id},{expiracion}"
-                print(f"8. CONTENIDO DEL QR CREADO: '{qr_content}'")
+                print(f"10. CONTENIDO DEL QR CREADO: '{qr_content}'")
                 
                 qr = qrcode.make(qr_content)
                 buffer = BytesIO()
                 qr.save(buffer)
                 buffer.seek(0)
                 img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-                print("9. IMAGEN QR CREADA EN MEMORIA.")
+                print("11. IMAGEN QR CREADA EN MEMORIA.")
                 
-                print(f"10. ENVIANDO QR A RASPBERRY PI EN URL: {RASPBERRY_PI_URL}")
+                print(f"12. ENVIANDO QR A RASPBERRY PI EN URL: {RASPBERRY_PI_URL}")
                 try:
                     response_pi = requests.post(RASPBERRY_PI_URL, json={
                         'pedido_id': pedido_id,
                         'expiracion': time.time() + expiracion,
                         'qr_texto': qr_content
                     }, timeout=10)
-                    print(f"11. RESPUESTA DE RASPBERRY PI: Código {response_pi.status_code}")
+                    print(f"13. RESPUESTA DE RASPBERRY PI: Código {response_pi.status_code}")
                     if response_pi.status_code != 200:
                         print(f"!!! ERROR: La Raspberry Pi respondió con un error: {response_pi.text}")
                 except requests.exceptions.RequestException as e:
                     print(f"!!! ERROR DE CONEXIÓN: No se pudo contactar a la Raspberry Pi: {e}")
             else:
-                print(f"6. PAGO NO APROBADO (Estado: {payment.get('status')}). No se genera QR.")
+                print(f"8. PAGO NO APROBADO (Estado: {payment.get('status')}). No se genera QR.")
         else:
-            print("2. Notificación ignorada (no es de tipo 'payment').")
+            print("4. Notificación ignorada (no es de tipo 'payment' o no tiene datos).")
 
     except Exception as e:
         print(f"!!! ERROR INESPERADO EN EL WEBHOOK: {e}")
@@ -148,3 +176,12 @@ def mercadopago_webhook():
 # -----------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=10000)
+
+
+
+
+
+
+
+
+
