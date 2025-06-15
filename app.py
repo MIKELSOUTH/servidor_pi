@@ -6,13 +6,16 @@ import base64
 from io import BytesIO
 import requests
 import mercadopago
+import os # <-- SE AGREGA LA LIBRERÍA 'os' PARA LEER VARIABLES DE ENTORNO
 
 # --- 1. CONFIGURACIÓN DE MERCADO PAGO ---
-sdk = mercadopago.SDK("APP_USR-778410764560218-061221-fdda74fc8a02e531d07b634e006cae15-2491526457")
+# --- MODIFICACIÓN: Ahora lee el Access Token de las variables de entorno de Render ---
+MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN")
+sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
 # --- MEJORA DE SEGURIDAD: AÑADE AQUÍ LA CLAVE SECRETA DE TU WEBHOOK ---
-# Esta es la clave que te generó Mercado Pago cuando configuraste la URL del webhook.
-WEBHOOK_SECRET = "b0e92cbf35214019555fb9c9106b73c3625d27bfd61f433ac6d0744b1e1b8e14"
+# --- MODIFICACIÓN: Ahora lee el Webhook Secret de las variables de entorno de Render ---
+WEBHOOK_SECRET = os.environ.get("MP_WEBHOOK_SECRET")
 
 
 # --- 2. CATÁLOGO DE PRODUCTOS ---
@@ -90,35 +93,29 @@ def crear_pago():
 def mercadopago_webhook():
     print("\n--- INICIANDO WEBHOOK ---")
     
-    # --- MEJORA 1: VERIFICACIÓN DE FIRMA (SEGURIDAD) ---
-    # Obtenemos la firma de la cabecera de la petición
+    # Verificación de Firma (Seguridad)
     signature = request.headers.get('x-signature')
     data_id = request.args.get('data.id')
     
     if WEBHOOK_SECRET and signature and data_id:
         print("1. Verificando firma del webhook...")
         try:
-            # Usamos la función del SDK para validar. Si la firma es inválida, generará un error.
             sdk.utils().validate_signature(signature, data_id, WEBHOOK_SECRET)
             print("2. ¡Firma validada con éxito!")
         except Exception as e:
             print(f"!!! ERROR DE SEGURIDAD: Firma de webhook inválida. {e}")
             return jsonify({"status": "error", "message": "Invalid signature"}), 400
-    # --- FIN DE MEJORA 1 ---
 
     try:
         data = request.get_json()
         print(f"3. DATOS RECIBIDOS: {data}")
 
-        # --- MEJORA 2: OBTENCIÓN DE DATOS MÁS SEGURA ---
-        # Usamos .get() para evitar que el programa se caiga si el formato no es el esperado
         if data and data.get("type") == "payment":
             print("4. TIPO DE NOTIFICACIÓN: 'payment'. Correcto.")
             payment_id = data.get("data", {}).get("id")
             if not payment_id:
                 print("!!! ERROR: El webhook es de tipo 'payment' pero no contiene un 'id'.")
-                return jsonify({"status": "ok"}), 200 # Respondemos 200 para que MP no reintente
-            # --- FIN DE MEJORA 2 ---
+                return jsonify({"status": "ok"}), 200
 
             print(f"5. ID DE PAGO EXTRAÍDO: {payment_id}")
 
@@ -176,12 +173,3 @@ def mercadopago_webhook():
 # -----------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=10000)
-
-
-
-
-
-
-
-
-
