@@ -23,7 +23,7 @@ if not MP_ACCESS_TOKEN:
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
 # URL del servidor de la Raspberry Pi (asegúrate de que sea la correcta)
-RASPBERRY_PI_URL = 'https://027d-191-126-185-178.ngrok-free.app/guardar_qr'
+RASPBERRY_PI_URL = 'https://19e0-191-126-185-178.ngrok-free.app/guardar_qr'
 
 # --- Catálogo de Productos (Formato Ordenado) ---
 CATALOGO_PRODUCTOS = {
